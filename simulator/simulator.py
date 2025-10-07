@@ -13,6 +13,7 @@ socket.bind("tcp://*:5555")
 socket.setsockopt(zmq.RCVTIMEO, 0)  # Non-blocking receives
 
 # Game state
+# With a real simulation, we'll be updating motor speeds to move a robot here
 message_text = "Waiting for messages..."
 font = pygame.font.Font(None, 36)
 
