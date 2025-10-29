@@ -23,13 +23,13 @@ class PhaseEnableMotor:
         return reply
 
     def forward(self, speed):
-        return self._send_command("forward", {"speed": speed})
+        return self._send_command("move", {"speed": speed})
 
     def backward(self, speed):
-        return self._send_command("backward", {"speed": speed})
+        return self._send_command("move", {"speed": -speed})
 
     def stop(self):
-        return self._send_command("stop")
+        return self._send_command("move", {"speed": 0})
 
     def close(self):
         self.socket.close()
