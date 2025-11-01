@@ -53,9 +53,7 @@ while running:
     # Render
     
     #execute command
-    if direction == "forward":
-        bot_y -= speed
-    elif direction == "backward":
+    if direction == "move":
         bot_y += speed
     elif direction == "stop":
         speed = 0
