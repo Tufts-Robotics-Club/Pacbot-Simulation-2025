@@ -1,3 +1,4 @@
+
 def load_maze(file_path):
     import json
     with open(file_path, 'r') as f:
@@ -10,3 +11,4 @@ def initialize_simulation(maze_file):
     height = maze['height']
     layout = maze['maze']
     return width, height, layout
+

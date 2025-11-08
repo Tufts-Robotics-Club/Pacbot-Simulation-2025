@@ -1,9 +1,12 @@
 import pygame
 import zmq
-
+import initialize
 # Initialize pygame
 pygame.init()
-screen = pygame.display.set_mode((800, 600))
+
+height, width, layout = initialize.initialize_simulation("simulator/mazes/mini.json")
+
+screen = pygame.display.set_mode((height * 100, width * 100))
 clock = pygame.time.Clock()
 
 # Set up ZeroMQ server (non-blocking)
@@ -16,6 +19,8 @@ socket.setsockopt(zmq.RCVTIMEO, 0)  # Non-blocking receives
 # With a real simulation, we'll be updating motor speeds to move a robot here
 message_text = "Waiting for messages..."
 font = pygame.font.Font(None, 36)
+
+    
 
 running = True
 while running:
@@ -33,11 +38,17 @@ while running:
     except zmq.Again:
         # No message available, continue game loop
         pass
-    
     # Render
     screen.fill((0, 0, 0))
     text_surface = font.render(message_text, True, (255, 255, 255))
     screen.blit(text_surface, (50, 50))
+
+    #maze 
+    for row, rownumber in zip(layout, range(height)):
+        for col, colnumber in zip(row, range(width)):
+            if col ==1:
+                pygame.draw.rect(screen, (0, 0, 255), (rownumber*100, colnumber*100,100,100))
+
     pygame.display.flip()
     
     clock.tick(60)  # 60 FPS
