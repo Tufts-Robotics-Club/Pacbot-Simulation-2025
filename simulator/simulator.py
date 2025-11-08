@@ -4,9 +4,12 @@ import initialize
 # Initialize pygame
 pygame.init()
 
-height, width, layout = initialize.initialize_simulation("simulator/mazes/mini.json")
+width, height, layout = initialize.initialize_simulation("simulator/mazes/mini.json")
+print("height: " + str(height))
+print("width: " + str(width))
 
-screen = pygame.display.set_mode((height * 100, width * 100))
+
+screen = pygame.display.set_mode((width * 100, height * 100))
 clock = pygame.time.Clock()
 
 # Set up ZeroMQ server (non-blocking)
@@ -45,9 +48,13 @@ while running:
 
     #maze 
     for row, rownumber in zip(layout, range(height)):
+        #print(height)
+        print(row)
         for col, colnumber in zip(row, range(width)):
             if col ==1:
-                pygame.draw.rect(screen, (0, 0, 255), (rownumber*100, colnumber*100,100,100))
+                pygame.draw.rect(screen, (0, 0, 255), (colnumber*100, rownumber*100,100,100))
+    print('end')
+
 
     pygame.display.flip()
     
