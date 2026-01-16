@@ -2,6 +2,7 @@
 Pacbot Simulator - Main simulation loop with robot physics.
 
 Receives motor commands via ZeroMQ and simulates robot movement.
+Includes maze rendering and collision detection.
 """
 
 import pygame
@@ -9,7 +10,9 @@ import zmq
 import json
 import time
 import math
+import os
 from robot import Robot
+from collision import CollisionHandler
 
 # Initialize pygame
 pygame.init()
@@ -33,22 +36,70 @@ MOTOR_PIN_CONFIG = {
     (5, 6): "west",
 }
 
-# Simulation area (meters) - robot moves in this space
-SIM_WIDTH = 2.0   # 2 meters wide
-SIM_HEIGHT = 2.0  # 2 meters tall
+# Maze configuration
+MAZE_FILE = "mazes/empty.json"  # Default maze (can be changed)
+CELL_SIZE = 0.3  # meters per cell (default, overridden by maze file)
+
+# Load maze
+def load_maze(filename):
+    """Load maze from JSON file."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    filepath = os.path.join(script_dir, filename)
+
+    try:
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+
+        grid = data.get("grid", [[]])
+        cell_size = data.get("cell_size", 0.3)
+        name = data.get("name", "unknown")
+
+        print(f"Loaded maze: {name}")
+        print(f"  Grid size: {len(grid[0])}x{len(grid)} cells")
+        print(f"  Cell size: {cell_size}m")
+
+        return grid, cell_size, name
+    except FileNotFoundError:
+        print(f"Warning: Maze file not found: {filepath}")
+        print("Using empty 7x7 arena")
+        return [
+            [1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1]
+        ], 0.3, "default"
+
+# Load maze and create collision handler
+maze_grid, CELL_SIZE, maze_name = load_maze(MAZE_FILE)
+collision_handler = CollisionHandler(maze_grid, CELL_SIZE)
+
+# Calculate simulation area from maze
+MAZE_WIDTH_CELLS = len(maze_grid[0]) if maze_grid else 7
+MAZE_HEIGHT_CELLS = len(maze_grid) if maze_grid else 7
+SIM_WIDTH = MAZE_WIDTH_CELLS * CELL_SIZE
+SIM_HEIGHT = MAZE_HEIGHT_CELLS * CELL_SIZE
 
 # Display settings
 SIM_DISPLAY_X = 50  # Simulation view left edge
 SIM_DISPLAY_Y = 50  # Simulation view top edge
 SIM_DISPLAY_WIDTH = 500
 SIM_DISPLAY_HEIGHT = 500
-PIXELS_PER_METER = SIM_DISPLAY_WIDTH / SIM_WIDTH
+PIXELS_PER_METER = min(SIM_DISPLAY_WIDTH / SIM_WIDTH, SIM_DISPLAY_HEIGHT / SIM_HEIGHT)
+
+# Adjust display size to maintain aspect ratio
+SIM_DISPLAY_WIDTH = int(SIM_WIDTH * PIXELS_PER_METER)
+SIM_DISPLAY_HEIGHT = int(SIM_HEIGHT * PIXELS_PER_METER)
 
 # Colors
 COLOR_BG = (30, 30, 30)
 COLOR_SIM_BG = (20, 20, 40)
 COLOR_SIM_BORDER = (60, 60, 80)
 COLOR_GRID = (40, 40, 60)
+COLOR_WALL = (60, 60, 100)
+COLOR_PATH = (20, 20, 40)
 COLOR_ROBOT = (255, 220, 50)  # Yellow
 COLOR_ROBOT_OUTLINE = (200, 170, 30)
 COLOR_DIRECTION = (255, 100, 100)
@@ -64,8 +115,30 @@ font_large = pygame.font.Font(None, 42)
 font_medium = pygame.font.Font(None, 28)
 font_small = pygame.font.Font(None, 22)
 
-# Create robot at center of simulation area
-robot = Robot(x=SIM_WIDTH/2, y=SIM_HEIGHT/2, theta=math.pi/2)  # Facing up
+# Find a valid starting position for the robot (center of maze or first open cell)
+def find_start_position(maze, cell_size):
+    """Find center of maze or first open cell."""
+    height = len(maze)
+    width = len(maze[0]) if maze else 0
+
+    # Try center first
+    center_y = height // 2
+    center_x = width // 2
+
+    if maze[center_y][center_x] == 0:
+        return (center_x + 0.5) * cell_size, (center_y + 0.5) * cell_size
+
+    # Search for first open cell
+    for y in range(height):
+        for x in range(width):
+            if maze[y][x] == 0:
+                return (x + 0.5) * cell_size, (y + 0.5) * cell_size
+
+    # Fallback to center
+    return SIM_WIDTH / 2, SIM_HEIGHT / 2
+
+start_x, start_y = find_start_position(maze_grid, CELL_SIZE)
+robot = Robot(x=start_x, y=start_y, theta=math.pi/2)  # Facing up
 
 # Message display
 last_command = "None"
@@ -181,23 +254,27 @@ def get_wheel_color(speed):
 
 
 def draw_simulation_area():
-    """Draw the simulation area with grid."""
+    """Draw the simulation area with maze."""
     # Background
     pygame.draw.rect(screen, COLOR_SIM_BG,
                     (SIM_DISPLAY_X, SIM_DISPLAY_Y, SIM_DISPLAY_WIDTH, SIM_DISPLAY_HEIGHT))
 
-    # Grid lines (every 0.25 meters)
-    grid_spacing = 0.25
-    for x in range(int(SIM_WIDTH / grid_spacing) + 1):
-        sx = SIM_DISPLAY_X + int(x * grid_spacing * PIXELS_PER_METER)
-        pygame.draw.line(screen, COLOR_GRID,
-                        (sx, SIM_DISPLAY_Y),
-                        (sx, SIM_DISPLAY_Y + SIM_DISPLAY_HEIGHT), 1)
-    for y in range(int(SIM_HEIGHT / grid_spacing) + 1):
-        sy = SIM_DISPLAY_Y + SIM_DISPLAY_HEIGHT - int(y * grid_spacing * PIXELS_PER_METER)
-        pygame.draw.line(screen, COLOR_GRID,
-                        (SIM_DISPLAY_X, sy),
-                        (SIM_DISPLAY_X + SIM_DISPLAY_WIDTH, sy), 1)
+    # Draw maze cells
+    cell_pixels = int(CELL_SIZE * PIXELS_PER_METER)
+
+    for row_idx, row in enumerate(maze_grid):
+        for col_idx, cell in enumerate(row):
+            # Calculate screen position (Y is flipped)
+            sx = SIM_DISPLAY_X + col_idx * cell_pixels
+            sy = SIM_DISPLAY_Y + SIM_DISPLAY_HEIGHT - (row_idx + 1) * cell_pixels
+
+            if cell == 1:  # Wall
+                pygame.draw.rect(screen, COLOR_WALL, (sx, sy, cell_pixels, cell_pixels))
+            else:  # Path
+                pygame.draw.rect(screen, COLOR_PATH, (sx, sy, cell_pixels, cell_pixels))
+
+            # Draw cell grid lines
+            pygame.draw.rect(screen, COLOR_GRID, (sx, sy, cell_pixels, cell_pixels), 1)
 
     # Border
     pygame.draw.rect(screen, COLOR_SIM_BORDER,
@@ -207,11 +284,11 @@ def draw_simulation_area():
     label = font_small.render("0", True, COLOR_LABEL)
     screen.blit(label, (SIM_DISPLAY_X - 15, SIM_DISPLAY_Y + SIM_DISPLAY_HEIGHT + 5))
 
-    label = font_small.render(f"{SIM_WIDTH}m", True, COLOR_LABEL)
-    screen.blit(label, (SIM_DISPLAY_X + SIM_DISPLAY_WIDTH - 20, SIM_DISPLAY_Y + SIM_DISPLAY_HEIGHT + 5))
+    label = font_small.render(f"{SIM_WIDTH:.1f}m", True, COLOR_LABEL)
+    screen.blit(label, (SIM_DISPLAY_X + SIM_DISPLAY_WIDTH - 30, SIM_DISPLAY_Y + SIM_DISPLAY_HEIGHT + 5))
 
-    label = font_small.render(f"{SIM_HEIGHT}m", True, COLOR_LABEL)
-    screen.blit(label, (SIM_DISPLAY_X - 35, SIM_DISPLAY_Y - 5))
+    label = font_small.render(f"{SIM_HEIGHT:.1f}m", True, COLOR_LABEL)
+    screen.blit(label, (SIM_DISPLAY_X - 40, SIM_DISPLAY_Y - 5))
 
 
 def draw_robot():
@@ -401,6 +478,8 @@ current_fps = 0
 print("=" * 60)
 print("Pacbot Simulator Started")
 print("=" * 60)
+print(f"Maze: {maze_name} ({MAZE_WIDTH_CELLS}x{MAZE_HEIGHT_CELLS} cells)")
+print(f"World size: {SIM_WIDTH:.2f}m x {SIM_HEIGHT:.2f}m")
 print(f"Robot starting at ({robot.x:.2f}, {robot.y:.2f})")
 print(f"Motor pin configuration:")
 for pins, wheel in MOTOR_PIN_CONFIG.items():
@@ -422,8 +501,9 @@ while running:
             if event.key == pygame.K_ESCAPE:
                 running = False
             elif event.key == pygame.K_r:
-                # Reset robot position
-                robot.set_position(SIM_WIDTH/2, SIM_HEIGHT/2, math.pi/2)
+                # Reset robot position to valid start location
+                reset_x, reset_y = find_start_position(maze_grid, CELL_SIZE)
+                robot.set_position(reset_x, reset_y, math.pi/2)
                 robot.stop()
                 last_command = "RESET (keyboard)"
             elif event.key == pygame.K_SPACE:
@@ -447,31 +527,8 @@ while running:
     while physics_accumulator >= PHYSICS_DT:
         robot.update(PHYSICS_DT)
 
-        # Keep robot in bounds (simple boundary collision)
-        x, y, theta = robot.get_position()
-        r = robot.radius
-        clamped = False
-
-        if x - r < 0:
-            x = r
-            robot.vx = max(0, robot.vx)
-            clamped = True
-        elif x + r > SIM_WIDTH:
-            x = SIM_WIDTH - r
-            robot.vx = min(0, robot.vx)
-            clamped = True
-
-        if y - r < 0:
-            y = r
-            robot.vy = max(0, robot.vy)
-            clamped = True
-        elif y + r > SIM_HEIGHT:
-            y = SIM_HEIGHT - r
-            robot.vy = min(0, robot.vy)
-            clamped = True
-
-        if clamped:
-            robot.set_position(x, y)
+        # Handle collisions with maze walls
+        collision_handler.resolve_collision(robot)
 
         physics_accumulator -= PHYSICS_DT
 

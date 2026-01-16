@@ -1,0 +1,12 @@
+{
+    "name": "mini",
+    "description": "5x5 test maze with walls around edges",
+    "cell_size": 0.3,
+    "grid": [
+        [1, 1, 1, 1, 1],
+        [1, 0, 0, 0, 1],
+        [1, 0, 1, 0, 1],
+        [1, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1]
+    ]
+}
