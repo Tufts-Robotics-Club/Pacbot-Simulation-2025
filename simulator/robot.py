@@ -24,7 +24,7 @@ class Robot:
     Simulates physics for a circular omniwheel robot.
     """
 
-    def __init__(self, x=0.0, y=0.0, theta=math.pi/2):
+    def __init__(self, x=0.0, y=0.0, theta=0):
         """
         Initialize robot at given position and orientation.
 

@@ -138,7 +138,7 @@ def find_start_position(maze, cell_size):
     return SIM_WIDTH / 2, SIM_HEIGHT / 2
 
 start_x, start_y = find_start_position(maze_grid, CELL_SIZE)
-robot = Robot(x=start_x, y=start_y, theta=math.pi/2)  # Facing up
+robot = Robot(x=start_x, y=start_y)  # Facing up
 
 # Message display
 last_command = "None"
