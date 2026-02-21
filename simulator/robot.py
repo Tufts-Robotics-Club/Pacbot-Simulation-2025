@@ -17,6 +17,7 @@ Physical Configuration:
 """
 
 import math
+import random
 
 
 class Robot:
@@ -24,7 +25,7 @@ class Robot:
     Simulates physics for a circular omniwheel robot.
     """
 
-    def __init__(self, x=0.0, y=0.0, theta=0):
+    def __init__(self, x=0.0, y=0.0, theta=0, motor_noise=False):
         """
         Initialize robot at given position and orientation.
 
@@ -32,6 +33,7 @@ class Robot:
             x: Initial x position (meters)
             y: Initial y position (meters)
             theta: Initial orientation (radians, 0=facing +X, pi/2=facing +Y)
+            motor_noise: If True, add small random fluctuations to motor speeds
         """
         # Position and orientation
         self.x = x
@@ -69,6 +71,10 @@ class Robot:
             "west": 0.0,
         }
 
+        # Motor noise
+        self.motor_noise = motor_noise
+        self.motor_noise_amount = 0.03  # ±3% of target speed
+
         # Physics parameters
         self.motor_tau = 0.05  # Motor response time constant (50ms)
 
@@ -91,6 +97,7 @@ class Robot:
     def _update_motor_speeds(self, dt):
         """
         Apply first-order lag to motor speeds (simulates motor response time).
+        Optionally adds small random fluctuations to simulate real motor imprecision.
         """
         alpha = dt / (self.motor_tau + dt)  # Smoothing factor
 
@@ -99,6 +106,12 @@ class Robot:
             actual = self.actual_speeds[wheel]
             # First-order lag filter
             self.actual_speeds[wheel] = actual + alpha * (target - actual)
+
+            # Add motor noise: small random fluctuation when motor is running
+            if self.motor_noise and abs(self.actual_speeds[wheel]) > 0.01:
+                noise = random.gauss(0, self.motor_noise_amount)
+                self.actual_speeds[wheel] += noise
+                self.actual_speeds[wheel] = max(-1.0, min(1.0, self.actual_speeds[wheel]))
 
     def _calculate_body_velocities(self):
         """

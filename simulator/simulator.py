@@ -5,6 +5,7 @@ Receives motor commands via ZeroMQ and simulates robot movement.
 Includes maze rendering and collision detection.
 """
 
+import argparse
 import pygame
 import zmq
 import json
@@ -13,6 +14,12 @@ import math
 import os
 from robot import Robot
 from collision import CollisionHandler
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Pacbot Simulator")
+parser.add_argument("--motor-noise", action="store_true",
+                    help="Add small random fluctuations to motor speeds")
+args = parser.parse_args()
 
 # Initialize pygame
 pygame.init()
@@ -138,7 +145,7 @@ def find_start_position(maze, cell_size):
     return SIM_WIDTH / 2, SIM_HEIGHT / 2
 
 start_x, start_y = find_start_position(maze_grid, CELL_SIZE)
-robot = Robot(x=start_x, y=start_y)  # Facing up
+robot = Robot(x=start_x, y=start_y, motor_noise=args.motor_noise)
 
 # Message display
 last_command = "None"
@@ -480,6 +487,7 @@ print("Pacbot Simulator Started")
 print("=" * 60)
 print(f"Maze: {maze_name} ({MAZE_WIDTH_CELLS}x{MAZE_HEIGHT_CELLS} cells)")
 print(f"World size: {SIM_WIDTH:.2f}m x {SIM_HEIGHT:.2f}m")
+print(f"Motor noise: {'ON' if args.motor_noise else 'OFF'}")
 print(f"Robot starting at ({robot.x:.2f}, {robot.y:.2f})")
 print(f"Motor pin configuration:")
 for pins, wheel in MOTOR_PIN_CONFIG.items():
