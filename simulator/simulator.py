@@ -19,6 +19,7 @@ from collision import CollisionHandler
 parser = argparse.ArgumentParser(description="Pacbot Simulator")
 parser.add_argument("--motor-noise", action="store_true",
                     help="Add small random fluctuations to motor speeds")
+parser.add_argument("--maze", default="mazes/empty.json", help="Maze file to load")
 args = parser.parse_args()
 
 # Initialize pygame
@@ -42,10 +43,6 @@ MOTOR_PIN_CONFIG = {
     (24, 25): "east",
     (5, 6): "west",
 }
-
-# Maze configuration
-MAZE_FILE = "mazes/empty.json"  # Default maze (can be changed)
-CELL_SIZE = 0.3  # meters per cell (default, overridden by maze file)
 
 # Load maze
 def load_maze(filename):
@@ -80,14 +77,14 @@ def load_maze(filename):
         ], 0.3, "default"
 
 # Load maze and create collision handler
-maze_grid, CELL_SIZE, maze_name = load_maze(MAZE_FILE)
-collision_handler = CollisionHandler(maze_grid, CELL_SIZE)
+maze_grid, cell_size, maze_name = load_maze(args.maze)
+collision_handler = CollisionHandler(maze_grid, cell_size)
 
 # Calculate simulation area from maze
 MAZE_WIDTH_CELLS = len(maze_grid[0]) if maze_grid else 7
 MAZE_HEIGHT_CELLS = len(maze_grid) if maze_grid else 7
-SIM_WIDTH = MAZE_WIDTH_CELLS * CELL_SIZE
-SIM_HEIGHT = MAZE_HEIGHT_CELLS * CELL_SIZE
+SIM_WIDTH = MAZE_WIDTH_CELLS * cell_size
+SIM_HEIGHT = MAZE_HEIGHT_CELLS * cell_size
 
 # Display settings
 SIM_DISPLAY_X = 50  # Simulation view left edge
@@ -144,7 +141,7 @@ def find_start_position(maze, cell_size):
     # Fallback to center
     return SIM_WIDTH / 2, SIM_HEIGHT / 2
 
-start_x, start_y = find_start_position(maze_grid, CELL_SIZE)
+start_x, start_y = find_start_position(maze_grid, cell_size)
 robot = Robot(x=start_x, y=start_y, motor_noise=args.motor_noise)
 
 # Message display
@@ -267,7 +264,7 @@ def draw_simulation_area():
                     (SIM_DISPLAY_X, SIM_DISPLAY_Y, SIM_DISPLAY_WIDTH, SIM_DISPLAY_HEIGHT))
 
     # Draw maze cells
-    cell_pixels = int(CELL_SIZE * PIXELS_PER_METER)
+    cell_pixels = int(cell_size * PIXELS_PER_METER)
 
     for row_idx, row in enumerate(maze_grid):
         for col_idx, cell in enumerate(row):
@@ -510,7 +507,7 @@ while running:
                 running = False
             elif event.key == pygame.K_r:
                 # Reset robot position to valid start location
-                reset_x, reset_y = find_start_position(maze_grid, CELL_SIZE)
+                reset_x, reset_y = find_start_position(maze_grid, cell_size)
                 robot.set_position(reset_x, reset_y, math.pi/2)
                 robot.stop()
                 last_command = "RESET (keyboard)"
