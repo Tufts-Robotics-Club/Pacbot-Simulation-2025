@@ -36,6 +36,10 @@ socket = context.socket(zmq.REP)
 socket.bind("tcp://*:5555")
 socket.setsockopt(zmq.RCVTIMEO, 0)  # Non-blocking receives
 
+# Set up ZeroMQ PUB socket for sensor data
+sensor_pub = context.socket(zmq.PUB)
+sensor_pub.bind("tcp://*:5556")
+
 # Motor pin configuration - maps (pin1, pin2) tuples to wheel positions
 MOTOR_PIN_CONFIG = {
     (17, 27): "north",
@@ -537,6 +541,11 @@ while running:
 
         physics_accumulator -= PHYSICS_DT
 
+    # Publish sensor data
+    pos = robot.get_position()
+    sensor_data = json.dumps({"x": pos[0], "y": pos[1], "theta": pos[2]})
+    sensor_pub.send_string(f"sensors {sensor_data}")
+
     # FPS calculation
     fps_counter += 1
     if current_time - fps_timer >= 1.0:
@@ -556,5 +565,6 @@ while running:
 
 pygame.quit()
 socket.close()
+sensor_pub.close()
 context.term()
 print("\nSimulator closed.")
