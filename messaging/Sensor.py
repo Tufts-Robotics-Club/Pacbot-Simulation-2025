@@ -20,12 +20,12 @@ class SensorSubscriber:
         except zmq.Again:
             return None
 
-    def get_position(self):
-        """Return latest (x, y, theta) or None if no data available."""
-        data = self.get_latest()
-        if data is None:
-            return None
-        return (data["x"], data["y"], data["theta"])
+    def get_tof(self):
+        """
+        Return latest ToF readings as dict {"north": dist, "south": dist, ...}
+        or None if no data available. Distances are in meters.
+        """
+        return self.get_latest()
 
     def get_latest(self):
         """Drain queue and return the most recent message dict, or None."""

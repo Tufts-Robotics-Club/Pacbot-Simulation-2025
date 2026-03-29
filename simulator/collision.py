@@ -251,6 +251,100 @@ class CollisionHandler:
 
         return None
 
+    def raycast(self, origin_x, origin_y, dir_x, dir_y, max_dist=2.0):
+        """
+        Cast a ray through the maze grid and return distance to nearest wall.
+
+        Uses DDA (Digital Differential Analyzer) for accurate grid traversal.
+
+        Args:
+            origin_x, origin_y: Ray start position in world coordinates
+            dir_x, dir_y: Ray direction (will be normalized)
+            max_dist: Maximum raycast distance in meters
+
+        Returns:
+            Distance to nearest wall in meters, or max_dist if no wall hit
+        """
+        # Normalize direction
+        length = math.sqrt(dir_x * dir_x + dir_y * dir_y)
+        if length < 1e-10:
+            return max_dist
+        dir_x /= length
+        dir_y /= length
+
+        cs = self.cell_size
+
+        # Check boundary hit distances
+        # If ray would exit maze bounds, treat boundary as wall
+        def boundary_dist():
+            dists = []
+            if dir_x > 0:
+                dists.append((self.maze_width * cs - origin_x) / dir_x)
+            elif dir_x < 0:
+                dists.append(-origin_x / dir_x)
+            if dir_y > 0:
+                dists.append((self.maze_height * cs - origin_y) / dir_y)
+            elif dir_y < 0:
+                dists.append(-origin_y / dir_y)
+            return min(dists) if dists else max_dist
+
+        bound_dist = boundary_dist()
+
+        # Current cell
+        cell_x = int(origin_x / cs)
+        cell_y = int(origin_y / cs)
+
+        # If starting inside a wall, return 0
+        if (0 <= cell_x < self.maze_width and 0 <= cell_y < self.maze_height
+                and self.maze[cell_y][cell_x] == 1):
+            return 0.0
+
+        # DDA setup
+        # Step direction
+        step_x = 1 if dir_x >= 0 else -1
+        step_y = 1 if dir_y >= 0 else -1
+
+        # Distance along ray to cross one full cell in each axis
+        delta_dist_x = abs(cs / dir_x) if abs(dir_x) > 1e-10 else 1e10
+        delta_dist_y = abs(cs / dir_y) if abs(dir_y) > 1e-10 else 1e10
+
+        # Distance from origin to the first cell boundary in each axis
+        if dir_x >= 0:
+            side_dist_x = ((cell_x + 1) * cs - origin_x) / dir_x if abs(dir_x) > 1e-10 else 1e10
+        else:
+            side_dist_x = (origin_x - cell_x * cs) / (-dir_x) if abs(dir_x) > 1e-10 else 1e10
+
+        if dir_y >= 0:
+            side_dist_y = ((cell_y + 1) * cs - origin_y) / dir_y if abs(dir_y) > 1e-10 else 1e10
+        else:
+            side_dist_y = (origin_y - cell_y * cs) / (-dir_y) if abs(dir_y) > 1e-10 else 1e10
+
+        # Step through grid
+        dist = 0.0
+        while dist < max_dist:
+            # Step to nearest cell boundary
+            if side_dist_x < side_dist_y:
+                dist = side_dist_x
+                side_dist_x += delta_dist_x
+                cell_x += step_x
+            else:
+                dist = side_dist_y
+                side_dist_y += delta_dist_y
+                cell_y += step_y
+
+            if dist > max_dist:
+                break
+
+            # Check if out of bounds (boundary = wall)
+            if cell_x < 0 or cell_x >= self.maze_width or cell_y < 0 or cell_y >= self.maze_height:
+                return min(dist, bound_dist, max_dist)
+
+            # Check if wall
+            if self.maze[cell_y][cell_x] == 1:
+                return dist
+
+        return max_dist
+
     def get_maze_dimensions(self):
         """Get maze dimensions in world coordinates."""
         return (

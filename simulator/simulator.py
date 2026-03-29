@@ -541,9 +541,24 @@ while running:
 
         physics_accumulator -= PHYSICS_DT
 
-    # Publish sensor data
-    pos = robot.get_position()
-    sensor_data = json.dumps({"x": pos[0], "y": pos[1], "theta": pos[2]})
+    # Publish ToF sensor data
+    # Each sensor is at a wheel position, facing outward from robot center
+    wheel_pos = robot.get_wheel_positions()
+    cos_t = math.cos(robot.theta)
+    sin_t = math.sin(robot.theta)
+    # Outward directions in world frame for each wheel
+    # Body frame: N=(0,+1), S=(0,-1), E=(+1,0), W=(-1,0)
+    tof_directions = {
+        "north": (0 * cos_t - 1 * sin_t, 0 * sin_t + 1 * cos_t),
+        "south": (0 * cos_t - (-1) * sin_t, 0 * sin_t + (-1) * cos_t),
+        "east":  (1 * cos_t - 0 * sin_t, 1 * sin_t + 0 * cos_t),
+        "west":  ((-1) * cos_t - 0 * sin_t, (-1) * sin_t + 0 * cos_t),
+    }
+    tof_readings = {}
+    for wheel, (wx, wy) in wheel_pos.items():
+        dx, dy = tof_directions[wheel]
+        tof_readings[wheel] = round(collision_handler.raycast(wx, wy, dx, dy), 4)
+    sensor_data = json.dumps(tof_readings)
     sensor_pub.send_string(f"sensors {sensor_data}")
 
     # FPS calculation

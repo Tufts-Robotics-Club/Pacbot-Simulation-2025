@@ -1,19 +1,18 @@
-"""Test script for sensor subscriber. Run alongside the simulator."""
+"""Test script for ToF sensor subscriber. Run alongside the simulator."""
 
 import time
-import math
 from Sensor import SensorSubscriber
 
 sensor = SensorSubscriber()
-print("Listening for sensor data on port 5556...")
+print("Listening for ToF sensor data on port 5556...")
 print("(Start the simulator if not already running)\n")
 
 try:
     while True:
-        pos = sensor.get_position()
-        if pos is not None:
-            x, y, theta = pos
-            print(f"Position: x={x:.4f}m  y={y:.4f}m  theta={math.degrees(theta):.1f}°")
+        tof = sensor.get_tof()
+        if tof is not None:
+            print(f"ToF:  N={tof['north']:.3f}m  S={tof['south']:.3f}m  "
+                  f"E={tof['east']:.3f}m  W={tof['west']:.3f}m")
         time.sleep(0.1)
 except KeyboardInterrupt:
     print("\nStopped.")
