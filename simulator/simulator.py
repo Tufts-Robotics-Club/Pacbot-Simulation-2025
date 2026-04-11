@@ -12,6 +12,7 @@ import json
 import time
 import math
 import os
+import random
 from robot import Robot
 from collision import CollisionHandler
 
@@ -19,6 +20,12 @@ from collision import CollisionHandler
 parser = argparse.ArgumentParser(description="Pacbot Simulator")
 parser.add_argument("--motor-noise", action="store_true",
                     help="Add small random fluctuations to motor speeds")
+parser.add_argument("--tof-noise", action="store_true",
+                    help="Add Gaussian noise to ToF distance readings (~5mm std dev)")
+parser.add_argument("--encoder-noise", action="store_true",
+                    help="Add Gaussian noise to encoder tick counts (~2 ticks std dev)")
+parser.add_argument("--imu-noise", action="store_true",
+                    help="Add Gaussian noise to IMU acceleration (~0.05 m/s²) and gyro (~0.01 rad/s)")
 parser.add_argument("--maze", default="mazes/empty.json", help="Maze file to load")
 args = parser.parse_args()
 
@@ -488,7 +495,10 @@ print("Pacbot Simulator Started")
 print("=" * 60)
 print(f"Maze: {maze_name} ({MAZE_WIDTH_CELLS}x{MAZE_HEIGHT_CELLS} cells)")
 print(f"World size: {SIM_WIDTH:.2f}m x {SIM_HEIGHT:.2f}m")
-print(f"Motor noise: {'ON' if args.motor_noise else 'OFF'}")
+print(f"Motor noise:   {'ON' if args.motor_noise else 'OFF'}")
+print(f"ToF noise:     {'ON' if args.tof_noise else 'OFF'}")
+print(f"Encoder noise: {'ON' if args.encoder_noise else 'OFF'}")
+print(f"IMU noise:     {'ON' if args.imu_noise else 'OFF'}")
 print(f"Robot starting at ({robot.x:.2f}, {robot.y:.2f})")
 print(f"Motor pin configuration:")
 for pins, wheel in MOTOR_PIN_CONFIG.items():
@@ -541,25 +551,44 @@ while running:
 
         physics_accumulator -= PHYSICS_DT
 
-    # Publish ToF sensor data
-    # Each sensor is at a wheel position, facing outward from robot center
-    wheel_pos = robot.get_wheel_positions()
+    # Publish sensor data on separate topics
     cos_t = math.cos(robot.theta)
     sin_t = math.sin(robot.theta)
-    # Outward directions in world frame for each wheel
-    # Body frame: N=(0,+1), S=(0,-1), E=(+1,0), W=(-1,0)
+
+    # --- ToF sensors ---
+    # Each sensor sits at its wheel position and faces radially outward
+    wheel_pos = robot.get_wheel_positions()
     tof_directions = {
-        "north": (0 * cos_t - 1 * sin_t, 0 * sin_t + 1 * cos_t),
-        "south": (0 * cos_t - (-1) * sin_t, 0 * sin_t + (-1) * cos_t),
-        "east":  (1 * cos_t - 0 * sin_t, 1 * sin_t + 0 * cos_t),
-        "west":  ((-1) * cos_t - 0 * sin_t, (-1) * sin_t + 0 * cos_t),
+        "north": (-sin_t,  cos_t),
+        "south": ( sin_t, -cos_t),
+        "east":  ( cos_t,  sin_t),
+        "west":  (-cos_t, -sin_t),
     }
     tof_readings = {}
     for wheel, (wx, wy) in wheel_pos.items():
         dx, dy = tof_directions[wheel]
-        tof_readings[wheel] = round(collision_handler.raycast(wx, wy, dx, dy), 4)
-    sensor_data = json.dumps(tof_readings)
-    sensor_pub.send_string(f"sensors {sensor_data}")
+        dist = collision_handler.raycast(wx, wy, dx, dy)
+        if args.tof_noise:
+            dist += random.gauss(0, 0.005)
+        tof_readings[wheel] = round(max(0.0, dist), 4)
+    sensor_pub.send_string(f"sensors.tof {json.dumps(tof_readings)}")
+
+    # --- Encoders ---
+    enc = robot.get_encoder_ticks()
+    if args.encoder_noise:
+        enc = {w: round(v + random.gauss(0, 2.0), 2) for w, v in enc.items()}
+    else:
+        enc = {w: round(v, 2) for w, v in enc.items()}
+    sensor_pub.send_string(f"sensors.encoders {json.dumps(enc)}")
+
+    # --- IMU ---
+    ax, ay, omega = robot.get_imu_data()
+    if args.imu_noise:
+        ax += random.gauss(0, 0.05)
+        ay += random.gauss(0, 0.05)
+        omega += random.gauss(0, 0.01)
+    imu_data = {"ax": round(ax, 4), "ay": round(ay, 4), "omega": round(omega, 4)}
+    sensor_pub.send_string(f"sensors.imu {json.dumps(imu_data)}")
 
     # FPS calculation
     fps_counter += 1

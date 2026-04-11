@@ -78,6 +78,16 @@ class Robot:
         # Physics parameters
         self.motor_tau = 0.05  # Motor response time constant (50ms)
 
+        # Encoder state (cumulative ticks per wheel, signed)
+        self.ticks_per_revolution = 512
+        self.encoder_ticks = {"north": 0.0, "south": 0.0, "east": 0.0, "west": 0.0}
+
+        # IMU state (body-frame acceleration, m/s²; angular velocity, rad/s)
+        self._prev_vx_body = 0.0
+        self._prev_vy_body = 0.0
+        self.ax_body = 0.0  # body +X acceleration
+        self.ay_body = 0.0  # body +Y acceleration
+
     def set_motor_speed(self, wheel, speed):
         """
         Set target speed for a specific wheel motor.
@@ -183,6 +193,20 @@ class Robot:
 
         # Calculate velocities in body frame from wheel speeds
         vx_body, vy_body, omega_body = self._calculate_body_velocities()
+
+        # IMU: body-frame acceleration from velocity derivative
+        self.ax_body = (vx_body - self._prev_vx_body) / dt
+        self.ay_body = (vy_body - self._prev_vy_body) / dt
+        self._prev_vx_body = vx_body
+        self._prev_vy_body = vy_body
+
+        # Encoders: accumulate ticks from wheel angular displacement
+        # wheel angular velocity (rad/s) = normalized_speed * max_linear_speed / wheel_radius
+        wheel_rads_per_norm = self.max_linear_speed / self.wheel_radius  # rad/s at speed=1.0
+        ticks_per_rad = self.ticks_per_revolution / (2 * math.pi)
+        for wheel in self.encoder_ticks:
+            angular_disp = self.actual_speeds[wheel] * wheel_rads_per_norm * dt
+            self.encoder_ticks[wheel] += angular_disp * ticks_per_rad
 
         # Transform body velocities to world frame
         cos_theta = math.cos(self.theta)
@@ -294,6 +318,33 @@ class Robot:
         }
 
         return positions
+
+    def get_encoder_ticks(self):
+        """
+        Get cumulative encoder tick counts for each wheel.
+
+        Returns:
+            Dict {"north": ticks, "south": ticks, "east": ticks, "west": ticks}
+            Positive = forward rotation, negative = backward.
+        """
+        return self.encoder_ticks.copy()
+
+    def reset_encoders(self):
+        """Zero all encoder tick counts."""
+        for wheel in self.encoder_ticks:
+            self.encoder_ticks[wheel] = 0.0
+
+    def get_imu_data(self):
+        """
+        Get IMU readings: body-frame linear acceleration and angular velocity.
+
+        Returns:
+            (ax, ay, omega):
+                ax: body +X acceleration (m/s²)
+                ay: body +Y / forward acceleration (m/s²)
+                omega: angular velocity (rad/s, positive = CCW)
+        """
+        return self.ax_body, self.ay_body, self.omega
 
     def get_state_dict(self):
         """
