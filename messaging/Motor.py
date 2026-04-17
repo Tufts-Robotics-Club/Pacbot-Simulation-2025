@@ -1,12 +1,15 @@
 import zmq
 import json
 
-# Goal is to have same interface as GPIO PhaseEnableMotor
-# May change if using different library in real motor module
-class PhaseEnableMotor:
-    def __init__(self, pin1, pin2):
-        self.pin1 = pin1
-        self.pin2 = pin2  # Pins are just an identifier here
+
+class Motor:
+    """
+    Client-side motor interface. Identifies a motor by a single numeric ID
+    (0=north, 1=south, 2=east, 3=west by convention — see simulator config).
+    """
+
+    def __init__(self, motor_id):
+        self.motor_id = motor_id
 
         # Set up ZeroMQ client
         self.context = zmq.Context()
@@ -14,7 +17,7 @@ class PhaseEnableMotor:
         self.socket.connect("tcp://localhost:5555")
 
     def _send_command(self, command, params=None):
-        message = {"command": command, "pin1": self.pin1, "pin2": self.pin2}
+        message = {"command": command, "id": self.motor_id}
         if params:
             message["params"] = params
         self.socket.send_string(json.dumps(message))

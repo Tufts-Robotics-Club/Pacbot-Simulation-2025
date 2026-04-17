@@ -47,12 +47,12 @@ socket.setsockopt(zmq.RCVTIMEO, 0)  # Non-blocking receives
 sensor_pub = context.socket(zmq.PUB)
 sensor_pub.bind("tcp://*:5557")
 
-# Motor pin configuration - maps (pin1, pin2) tuples to wheel positions
-MOTOR_PIN_CONFIG = {
-    (17, 27): "north",
-    (22, 23): "south",
-    (24, 25): "east",
-    (5, 6): "west",
+# Motor ID configuration - maps numeric motor IDs to wheel positions
+MOTOR_ID_CONFIG = {
+    0: "north",
+    1: "south",
+    2: "east",
+    3: "west",
 }
 
 # Load maze
@@ -164,40 +164,27 @@ physics_accumulator = 0.0
 last_physics_time = time.time()
 
 
-def get_wheel_position(pin1, pin2):
-    """Look up which wheel corresponds to the given pin pair."""
-    key = (pin1, pin2)
-    if key in MOTOR_PIN_CONFIG:
-        return MOTOR_PIN_CONFIG[key]
-    key_rev = (pin2, pin1)
-    if key_rev in MOTOR_PIN_CONFIG:
-        return MOTOR_PIN_CONFIG[key_rev]
-    return None
-
-
 def handle_motor_command(message_data):
-    """Handle incoming motor commands from PhaseEnableMotor instances."""
+    """Handle incoming motor commands from Motor client instances."""
     global last_command
 
     command = message_data.get("command", "unknown")
-    pin1 = message_data.get("pin1")
-    pin2 = message_data.get("pin2")
+    motor_id = message_data.get("id")
     params = message_data.get("params", {})
 
-    wheel = get_wheel_position(pin1, pin2)
+    wheel = MOTOR_ID_CONFIG.get(motor_id)
 
     response = {
         "status": "ok",
         "command": command,
-        "pin1": pin1,
-        "pin2": pin2,
+        "id": motor_id,
         "wheel": wheel
     }
 
     if wheel is None:
         response["status"] = "warning"
-        response["message"] = f"Unknown motor pins ({pin1}, {pin2})"
-        last_command = f"WARNING: Unknown pins ({pin1}, {pin2})"
+        response["message"] = f"Unknown motor id: {motor_id}"
+        last_command = f"WARNING: Unknown id {motor_id}"
         return response
 
     if command == "move":
@@ -500,9 +487,9 @@ print(f"ToF noise:     {'ON' if args.tof_noise else 'OFF'}")
 print(f"Encoder noise: {'ON' if args.encoder_noise else 'OFF'}")
 print(f"IMU noise:     {'ON' if args.imu_noise else 'OFF'}")
 print(f"Robot starting at ({robot.x:.2f}, {robot.y:.2f})")
-print(f"Motor pin configuration:")
-for pins, wheel in MOTOR_PIN_CONFIG.items():
-    print(f"  Pins {pins} -> {wheel} wheel")
+print(f"Motor ID configuration:")
+for motor_id, wheel in MOTOR_ID_CONFIG.items():
+    print(f"  ID {motor_id} -> {wheel} wheel")
 print("=" * 60)
 
 while running:

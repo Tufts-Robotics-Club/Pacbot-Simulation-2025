@@ -1,7 +1,7 @@
-from Motor import PhaseEnableMotor
+from Motor import Motor
 from time import sleep
 
-motor = PhaseEnableMotor(pin1=17, pin2=27)
+motor = Motor(0)  # North
 
 
 print(motor.forward(speed=1))

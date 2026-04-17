@@ -11,15 +11,15 @@ Make sure the simulator is running before executing this script!
 Watch the simulator window to see the robot move.
 """
 
-from Motor import PhaseEnableMotor
+from Motor import Motor
 from time import sleep
 import sys
 
-# Pin configuration - must match simulator's MOTOR_PIN_CONFIG
-NORTH_PINS = (17, 27)
-SOUTH_PINS = (22, 23)
-EAST_PINS = (24, 25)
-WEST_PINS = (5, 6)
+# Motor ID configuration - must match simulator's MOTOR_ID_CONFIG
+NORTH_ID = 0
+SOUTH_ID = 1
+EAST_ID = 2
+WEST_ID = 3
 
 
 def main():
@@ -33,10 +33,10 @@ def main():
     try:
         # Create 4 motor instances
         print("Connecting motors...")
-        motor_north = PhaseEnableMotor(pin1=NORTH_PINS[0], pin2=NORTH_PINS[1])
-        motor_south = PhaseEnableMotor(pin1=SOUTH_PINS[0], pin2=SOUTH_PINS[1])
-        motor_east = PhaseEnableMotor(pin1=EAST_PINS[0], pin2=EAST_PINS[1])
-        motor_west = PhaseEnableMotor(pin1=WEST_PINS[0], pin2=WEST_PINS[1])
+        motor_north = Motor(NORTH_ID)
+        motor_south = Motor(SOUTH_ID)
+        motor_east = Motor(EAST_ID)
+        motor_west = Motor(WEST_ID)
         print("Connected!\n")
 
         motors = {
