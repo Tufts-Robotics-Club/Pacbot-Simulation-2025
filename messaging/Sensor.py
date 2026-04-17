@@ -3,7 +3,7 @@ import json
 
 
 class SensorSubscriber:
-    def __init__(self, host="localhost", port=5556):
+    def __init__(self, host="localhost", port=5557):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.connect(f"tcp://{host}:{port}")

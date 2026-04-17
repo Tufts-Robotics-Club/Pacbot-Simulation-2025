@@ -73,7 +73,7 @@ class Robot:
 
         # Motor noise
         self.motor_noise = motor_noise
-        self.motor_noise_amount = 0.03  # ±3% of target speed
+        self.motor_noise_amount = 0.05  # ±5% of target speed
 
         # Physics parameters
         self.motor_tau = 0.05  # Motor response time constant (50ms)

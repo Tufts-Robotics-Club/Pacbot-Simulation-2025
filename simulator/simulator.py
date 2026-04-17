@@ -45,7 +45,7 @@ socket.setsockopt(zmq.RCVTIMEO, 0)  # Non-blocking receives
 
 # Set up ZeroMQ PUB socket for sensor data
 sensor_pub = context.socket(zmq.PUB)
-sensor_pub.bind("tcp://*:5556")
+sensor_pub.bind("tcp://*:5557")
 
 # Motor pin configuration - maps (pin1, pin2) tuples to wheel positions
 MOTOR_PIN_CONFIG = {
