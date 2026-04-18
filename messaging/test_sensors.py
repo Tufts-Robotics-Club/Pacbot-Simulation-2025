@@ -2,34 +2,36 @@
 
 import time
 import math
-from Sensor import SensorSubscriber
+from sensors import ToFSensor, Encoder, IMU
 
-sensor = SensorSubscriber()
-print("Listening for sensor data on port 5556...")
+# Instantiate one of each per wheel, plus the IMU
+tofs = {name: ToFSensor(i) for i, name in enumerate(["N", "S", "E", "W"])}
+encs = {name: Encoder(i) for i, name in enumerate(["N", "S", "E", "W"])}
+imu = IMU()
+
+print("Listening for sensor data on port 5557...")
 print("(Start the simulator if not already running)\n")
 
 try:
     while True:
-        all_data = sensor.get_all()
+        tof_vals = {k: s.read() for k, s in tofs.items()}
+        enc_vals = {k: s.read() for k, s in encs.items()}
+        imu_data = imu.read()
 
-        tof = all_data["tof"]
-        enc = all_data["encoders"]
-        imu = all_data["imu"]
-
-        if tof:
-            print(f"ToF(m):  N={tof['north']:.3f}  S={tof['south']:.3f}  "
-                  f"E={tof['east']:.3f}  W={tof['west']:.3f}")
-        if enc:
-            print(f"Enc(tk): N={enc['north']:8.1f}  S={enc['south']:8.1f}  "
-                  f"E={enc['east']:8.1f}  W={enc['west']:8.1f}")
-        if imu:
-            print(f"IMU:     ax={imu['ax']:7.3f} m/s²  ay={imu['ay']:7.3f} m/s²  "
-                  f"ω={math.degrees(imu['omega']):7.2f} °/s")
-        if any(all_data.values()):
+        if all(v is not None for v in tof_vals.values()):
+            print("ToF(m):  " + "  ".join(f"{k}={v:.3f}" for k, v in tof_vals.items()))
+        if all(v is not None for v in enc_vals.values()):
+            print("Enc(tk): " + "  ".join(f"{k}={v:8.1f}" for k, v in enc_vals.items()))
+        if imu_data:
+            print(f"IMU:     ax={imu_data['ax']:7.3f} m/s²  "
+                  f"ay={imu_data['ay']:7.3f} m/s²  "
+                  f"ω={math.degrees(imu_data['omega']):7.2f} °/s")
             print()
 
         time.sleep(0.1)
 except KeyboardInterrupt:
     print("\nStopped.")
 finally:
-    sensor.close()
+    for s in list(tofs.values()) + list(encs.values()):
+        s.close()
+    imu.close()
